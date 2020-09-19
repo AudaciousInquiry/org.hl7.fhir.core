@@ -17,6 +17,9 @@ import org.hl7.fhir.r4.model.ExpressionNode.*;
 import org.hl7.fhir.r4.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r4.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r4.model.TypeDetails.ProfiledType;
+import org.hl7.fhir.r4.model.ValueSet.ConceptReferenceComponent;
+import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r4.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r4.utils.FHIRLexer.FHIRLexerException;
 import org.hl7.fhir.r4.utils.FHIRPathEngine.IEvaluationContext.FunctionDetails;
 import org.hl7.fhir.utilities.TerminologyServiceOptions;
@@ -2943,11 +2946,124 @@ public class FHIRPathEngine {
 
 
   private List<Base> funcMemberOf(ExecutionContext context, List<Base> focus, ExpressionNode exp) {
-    throw new Error("not Implemented yet");
+    List<Base> valueSet = execute(context, focus, exp.getParameters().get(0), false);
+    Set<String> vs = resolveAndInitialize(context, valueSet.get(0).primitiveValue());
+    return Collections.singletonList(new BooleanType(doMemberOf(focus, vs)));
   }
 
+  private Set<String> resolveAndInitialize(ExecutionContext context, String url) {
+      ValueSet vs = hostServices != null ?
+          hostServices.resolveValueSet(context.appInfo, url) :
+          worker.fetchResource(ValueSet.class, url);
 
-  private List<Base> funcDescendants(ExecutionContext context, List<Base> focus, ExpressionNode exp) throws FHIRException {
+      if (vs == null) {
+      }
+      @SuppressWarnings("unchecked")
+      Set<String> set = (Set<String>) vs.getUserData("values");
+      if (set == null) {
+          set = initializeValueSet(context, vs);
+      }
+      return set;
+  }
+
+  private boolean doMemberOf(List<Base> codes, Set<String> set) {
+      for (Base code: codes) {
+          if (code instanceof Coding) {
+              String s = ((Coding) code).getSystem() + "#" + ((Coding) code).getCode();
+              if (set.contains(s)) {
+                  return true;
+              }
+          } else if (code instanceof CodeableConcept) {
+              for (Coding c : ((CodeableConcept) code).getCoding()) {
+                  String s = c.getSystem() + "#" + c.getCode();
+                  if (set.contains(s)) {
+                      return true;
+                  }
+              }
+          } else if (code instanceof PrimitiveType) {
+              String s = code.primitiveValue();
+              if (set.contains(s)) {
+                  return true;
+              }
+          }
+      }
+      return false;
+  }
+
+  private Set<String> initializeValueSet(ExecutionContext context, ValueSet vs) {
+      Set<String> set = new HashSet<>();
+      vs.setUserData("values", set);
+      if (vs.hasExpansion()) {
+          List<ValueSetExpansionContainsComponent> contains = vs.getExpansion().getContains();
+          handleContains(contains, set);
+      } else {
+          // Do our best for composition with include/exclude
+          // Does NOT handle filter rules, versioning, or retrieval
+          // of code systems (only value-sets).
+
+          for (ConceptSetComponent cs : vs.getCompose().getInclude()) {
+              // include all defined concepts.
+              String system = cs.getSystem();
+              if (cs.hasSystem() && !cs.hasConcept()) {
+                  throw new Error("CodeSystem retrieval not Implemented yet");
+              } else if (cs.hasFilter()) {
+                  throw new Error("Use of include.filter not Implemented yet");
+              }
+
+              for (ConceptReferenceComponent ref : cs.getConcept()) {
+                  String code = system + "#" + ref.getCode();
+                  set.add(code);
+                  set.add(ref.getCode());
+              }
+
+              for (CanonicalType vsInclude : cs.getValueSet()) {
+                  Set<String> set2 = resolveAndInitialize(context, vsInclude.primitiveValue());
+                  if (set2 != null) {
+                      set.addAll(set2);
+                  }
+              }
+          }
+          for (ConceptSetComponent cs : vs.getCompose().getExclude()) {
+              String system = cs.getSystem();
+
+              if (cs.hasSystem() && !cs.hasConcept()) {
+                  throw new Error("CodeSystem retrieval not Implemented yet");
+              } else if (cs.hasFilter()) {
+                  throw new Error("Use of exclude.filter not Implemented yet");
+              }
+
+              for (ConceptReferenceComponent ref : cs.getConcept()) {
+                  String code = system + "#" + ref.getCode();
+                  set.remove(code);
+                  set.remove(ref.getCode());
+              }
+              for (CanonicalType vsExclude : cs.getValueSet()) {
+                  Set<String> set2 = resolveAndInitialize(context, vsExclude.primitiveValue());
+                  if (set2 != null) {
+                      set.removeAll(set2);
+                  }
+              }
+          }
+      }
+      return set;
+  }
+
+  private void handleContains(List<ValueSetExpansionContainsComponent> contains, Set<String> set) {
+      for (ValueSetExpansionContainsComponent exp : contains) {
+          if (exp.hasSystem() && exp.hasCode()) {
+              String code = exp.getSystem() + "#" + exp.getCode();
+              set.add(code);
+          } else if (exp.hasCode()) {
+              set.add("#" + exp.getCode());
+          }
+          set.add(exp.getCode());
+          if (exp.hasContains()) {
+              handleContains(exp.getContains(), set);
+          }
+      }
+  }
+
+private List<Base> funcDescendants(ExecutionContext context, List<Base> focus, ExpressionNode exp) throws FHIRException {
     List<Base> result = new ArrayList<Base>();
     List<Base> current = new ArrayList<Base>();
     current.addAll(focus);
