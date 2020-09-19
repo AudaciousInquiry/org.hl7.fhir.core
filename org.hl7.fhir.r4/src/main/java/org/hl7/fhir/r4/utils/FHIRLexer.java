@@ -5,30 +5,30 @@ import org.hl7.fhir.exceptions.FHIRException;
 /*
   Copyright (c) 2011+, HL7, Inc.
   All rights reserved.
-  
-  Redistribution and use in source and binary forms, with or without modification, 
+
+  Redistribution and use in source and binary forms, with or without modification,
   are permitted provided that the following conditions are met:
-    
-   * Redistributions of source code must retain the above copyright notice, this 
+
+   * Redistributions of source code must retain the above copyright notice, this
      list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above copyright notice, 
-     this list of conditions and the following disclaimer in the documentation 
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
      and/or other materials provided with the distribution.
-   * Neither the name of HL7 nor the names of its contributors may be used to 
-     endorse or promote products derived from this software without specific 
+   * Neither the name of HL7 nor the names of its contributors may be used to
+     endorse or promote products derived from this software without specific
      prior written permission.
-  
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
   POSSIBILITY OF SUCH DAMAGE.
-  
+
  */
 
 
@@ -37,7 +37,7 @@ import org.hl7.fhir.r4.model.ExpressionNode;
 import org.hl7.fhir.r4.model.ExpressionNode.SourceLocation;
 import org.hl7.fhir.utilities.Utilities;
 
-// shared lexer for concrete syntaxes 
+// shared lexer for concrete syntaxes
 // - FluentPath
 // - Mapping language
 
@@ -90,8 +90,8 @@ public class FHIRLexer {
   }
 
   public boolean isConstant() {
-    return current != null && (current.charAt(0) == '\'' || current.charAt(0) == '"') || current.charAt(0) == '@' || current.charAt(0) == '%' || 
-        current.charAt(0) == '-' || current.charAt(0) == '+' || (current.charAt(0) >= '0' && current.charAt(0) <= '9') || 
+    return current != null && (current.charAt(0) == '\'' || current.charAt(0) == '"') || current.charAt(0) == '@' || current.charAt(0) == '%' ||
+        current.charAt(0) == '-' || current.charAt(0) == '+' || (current.charAt(0) >= '0' && current.charAt(0) <= '9') ||
         current.equals("true") || current.equals("false") || current.equals("{}");
   }
 
@@ -128,7 +128,7 @@ public class FHIRLexer {
       return true;
 
     if ((current.charAt(0) >= 'A' && current.charAt(0) <= 'Z') || (current.charAt(0) >= 'a' && current.charAt(0) <= 'z')) {
-      for (int i = 1; i < current.length(); i++) 
+      for (int i = 1; i < current.length(); i++)
         if (!( (current.charAt(1) >= 'A' && current.charAt(1) <= 'Z') || (current.charAt(1) >= 'a' && current.charAt(1) <= 'z') ||
             (current.charAt(1) >= '0' && current.charAt(1) <= '9')))
           return false;
@@ -145,18 +145,51 @@ public class FHIRLexer {
     return new FHIRLexerException("Error in "+name+" at "+location+": "+msg);
   }
 
+  private boolean startsWithComment(String source, int cursor) {
+      return source.length() > cursor + 2 &&
+             source.charAt(cursor) == '/' &&
+             (source.charAt(cursor + 1) == '/' || source.charAt(cursor + 1) == '*');
+  }
+
   public void next() throws FHIRLexerException {
     current = null;
     boolean last13 = false;
-    while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) {
-      if (source.charAt(cursor) == '\r') {
+    boolean inComment = false;
+    boolean isSingleLine = false;
+
+    while (cursor < source.length() &&
+            (inComment ||
+             Character.isWhitespace(source.charAt(cursor)) ||
+             startsWithComment(source, cursor))
+    ) {
+      char ch = source.charAt(cursor);
+      if (ch == '\r') {
         currentLocation.setLine(currentLocation.getLine() + 1);
         currentLocation.setColumn(1);
         last13 = true;
-      } else if (!last13 && (source.charAt(cursor) == '\n')) {
+        if (inComment && isSingleLine)
+          inComment = false;
+      } else if (!last13 && (ch == '\n')) {
         currentLocation.setLine(currentLocation.getLine() + 1);
         currentLocation.setColumn(1);
         last13 = false;
+        if (inComment && isSingleLine)
+            inComment = false;
+      } else if (!inComment) {
+        if (cursor + 1 < source.length()) {
+            switch (source.charAt(cursor + 1)) {
+            case '/':
+                isSingleLine = true;
+            case '*':
+                inComment = true;
+                break;
+            }
+        }
+      } else if (inComment && !isSingleLine && ch == '*') {
+          if (cursor + 1 < source.length() && source.charAt(cursor + 1) == '/') {
+              inComment = isSingleLine = false;
+              cursor++;
+          }
       } else {
         last13 = false;
         currentLocation.setColumn(currentLocation.getColumn() + 1);
@@ -169,12 +202,12 @@ public class FHIRLexer {
       char ch = source.charAt(cursor);
       if (ch == '!' || ch == '>' || ch == '<' || ch == ':' || ch == '-' || ch == '=')  {
         cursor++;
-        if (cursor < source.length() && (source.charAt(cursor) == '=' || source.charAt(cursor) == '~' || source.charAt(cursor) == '-') || (ch == '-' && source.charAt(cursor) == '>')) 
+        if (cursor < source.length() && (source.charAt(cursor) == '=' || source.charAt(cursor) == '~' || source.charAt(cursor) == '-') || (ch == '-' && source.charAt(cursor) == '>'))
           cursor++;
         current = source.substring(currentStart, cursor);
       } else if (ch == '.' ) {
         cursor++;
-        if (cursor < source.length() && (source.charAt(cursor) == '.')) 
+        if (cursor < source.length() && (source.charAt(cursor) == '.'))
           cursor++;
         current = source.substring(currentStart, cursor);
       } else if (ch >= '0' && ch <= '9') {
@@ -189,8 +222,8 @@ public class FHIRLexer {
           cursor--;
         current = source.substring(currentStart, cursor);
       }  else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
-        while (cursor < source.length() && ((source.charAt(cursor) >= 'A' && source.charAt(cursor) <= 'Z') || (source.charAt(cursor) >= 'a' && source.charAt(cursor) <= 'z') || 
-            (source.charAt(cursor) >= '0' && source.charAt(cursor) <= '9') || source.charAt(cursor) == '_')) 
+        while (cursor < source.length() && ((source.charAt(cursor) >= 'A' && source.charAt(cursor) <= 'Z') || (source.charAt(cursor) >= 'a' && source.charAt(cursor) <= 'z') ||
+            (source.charAt(cursor) >= '0' && source.charAt(cursor) <= '9') || source.charAt(cursor) == '_'))
           cursor++;
         current = source.substring(currentStart, cursor);
       } else if (ch == '%') {
@@ -201,7 +234,7 @@ public class FHIRLexer {
             cursor++;
           cursor++;
         } else
-        while (cursor < source.length() && ((source.charAt(cursor) >= 'A' && source.charAt(cursor) <= 'Z') || (source.charAt(cursor) >= 'a' && source.charAt(cursor) <= 'z') || 
+        while (cursor < source.length() && ((source.charAt(cursor) >= 'A' && source.charAt(cursor) <= 'Z') || (source.charAt(cursor) >= 'a' && source.charAt(cursor) <= 'z') ||
             (source.charAt(cursor) >= '0' && source.charAt(cursor) <= '9') || source.charAt(cursor) == ':' || source.charAt(cursor) == '-'))
           cursor++;
         current = source.substring(currentStart, cursor);
@@ -209,7 +242,7 @@ public class FHIRLexer {
         cursor++;
         if (cursor < source.length() && (source.charAt(cursor) == '/')) {
           cursor++;
-          while (cursor < source.length() && !((source.charAt(cursor) == '\r') || source.charAt(cursor) == '\n')) 
+          while (cursor < source.length() && !((source.charAt(cursor) == '\r') || source.charAt(cursor) == '\n'))
             cursor++;
         }
         current = source.substring(currentStart, cursor);
@@ -230,7 +263,7 @@ public class FHIRLexer {
         while (cursor < source.length() && (escape || source.charAt(cursor) != '"')) {
           if (escape)
             escape = false;
-          else 
+          else
             escape = (source.charAt(cursor) == '\\');
           cursor++;
         }
@@ -244,7 +277,7 @@ public class FHIRLexer {
         while (cursor < source.length() && (escape || source.charAt(cursor) != '`')) {
           if (escape)
             escape = false;
-          else 
+          else
             escape = (source.charAt(cursor) == '\\');
           cursor++;
         }
@@ -259,7 +292,7 @@ public class FHIRLexer {
         while (cursor < source.length() && (escape || source.charAt(cursor) != ech)) {
           if (escape)
             escape = false;
-          else 
+          else
             escape = (source.charAt(cursor) == '\\');
           cursor++;
         }
@@ -275,7 +308,7 @@ public class FHIRLexer {
         while (cursor < source.length() && (escape || source.charAt(cursor) != '`')) {
           if (escape)
             escape = false;
-          else 
+          else
             escape = (source.charAt(cursor) == '\\');
           cursor++;
         }
@@ -287,7 +320,7 @@ public class FHIRLexer {
         int start = cursor;
         cursor++;
         while (cursor < source.length() && isDateChar(source.charAt(cursor), start))
-          cursor++;          
+          cursor++;
         current = source.substring(currentStart, cursor);
       } else { // if CharInSet(ch, ['.', ',', '(', ')', '=', '$']) then
         cursor++;
@@ -299,7 +332,7 @@ public class FHIRLexer {
 
   private boolean isDateChar(char ch,int start) {
     int eot = source.charAt(start+1) == 'T' ? 10 : 20;
-    
+
     return ch == '-' || ch == ':' || ch == 'T' || ch == '+' || ch == 'Z' || Character.isDigit(ch) || (cursor-start == eot && ch == '.' && cursor < source.length()-1&& Character.isDigit(source.charAt(cursor+1)));
   }
   public boolean isOp() {
@@ -315,7 +348,7 @@ public class FHIRLexer {
   public SourceLocation getCurrentStartLocation() {
     return currentStartLocation;
   }
-  
+
   // special case use
   public void setCurrent(String current) {
     this.current = current;
@@ -328,20 +361,20 @@ public class FHIRLexer {
     return !done() && kw.equals(current);
   }
   public boolean hasToken(String... names) {
-    if (done()) 
+    if (done())
       return false;
     for (String s : names)
       if (s.equals(current))
         return true;
     return false;
   }
-  
+
   public void token(String kw) throws FHIRLexerException {
-    if (!kw.equals(current)) 
+    if (!kw.equals(current))
       throw error("Found \""+current+"\" expecting \""+kw+"\"");
     next();
   }
-  
+
   public String readConstant(String desc) throws FHIRLexerException {
     if (!isStringConstant())
       throw error("Found "+current+" expecting \"["+desc+"]\"");
@@ -364,16 +397,16 @@ public class FHIRLexer {
       if (ch == '\\') {
         i++;
         switch (s.charAt(i)) {
-        case 't': 
+        case 't':
           b.append('\t');
           break;
         case 'r':
           b.append('\r');
           break;
-        case 'n': 
+        case 'n':
           b.append('\n');
           break;
-        case 'f': 
+        case 'f':
           b.append('\f');
           break;
         case '\'':
@@ -385,10 +418,10 @@ public class FHIRLexer {
         case '`':
           b.append('`');
           break;
-        case '\\': 
+        case '\\':
           b.append('\\');
           break;
-        case '/': 
+        case '/':
           b.append('/');
           break;
         case 'u':
@@ -407,7 +440,7 @@ public class FHIRLexer {
     }
     return b.toString();
   }
-  
+
   public String processFixedName(String s) throws FHIRLexerException {
     StringBuilder b = new StringBuilder();
     int i = 1;
@@ -416,16 +449,16 @@ public class FHIRLexer {
       if (ch == '\\') {
         i++;
         switch (s.charAt(i)) {
-        case 't': 
+        case 't':
           b.append('\t');
           break;
         case 'r':
           b.append('\r');
           break;
-        case 'n': 
+        case 'n':
           b.append('\n');
           break;
-        case 'f': 
+        case 'f':
           b.append('\f');
           break;
         case '\'':
@@ -434,10 +467,10 @@ public class FHIRLexer {
         case '"':
           b.append('"');
           break;
-        case '\\': 
+        case '\\':
           b.append('\\');
           break;
-        case '/': 
+        case '/':
           b.append('/');
           break;
         case 'u':
@@ -460,7 +493,7 @@ public class FHIRLexer {
   public void skipToken(String token) throws FHIRLexerException {
     if (getCurrent().equals(token))
       next();
-    
+
   }
   public String takeDottedToken() throws FHIRLexerException {
     StringBuilder b = new StringBuilder();
@@ -471,7 +504,7 @@ public class FHIRLexer {
     }
     return b.toString();
   }
-  
+
   void skipComments() throws FHIRLexerException {
     while (!done() && hasComment())
       next();
