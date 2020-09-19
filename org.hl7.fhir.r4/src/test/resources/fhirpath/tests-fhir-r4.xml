@@ -1009,6 +1009,35 @@
     <test inputfile="patient-example.xml"><expression invalid="true">conformsTo('http://trash')</expression></test>
 	</group>
 
+  <group name="testComments">
+    <test name="Single line comment at start" inputfile="patient-example.xml" predicate="false">
+        <expression>// This is a single line comment at the start&#xA;birthDate</expression>
+        <output type="date">1974-12-25</output>
+    </test>
+    <test name="Single line comment at end" inputfile="patient-example.xml" predicate="false">
+        <expression>birthDate &#xA;// This is a single line comment at the end
+        </expression>
+        <output type="date">1974-12-25</output>
+    </test>
+    <test name="Single line comment in middle" inputfile="patient-example.xml" predicate="false">
+        <expression>Patient.&#xA;// This is a single line comment in the middle&#xA;birthDate</expression>
+        <output type="date">1974-12-25</output>
+    </test>
+    <test name="Multiline comment at start" inputfile="patient-example.xml" predicate="false">
+        <expression>/*&#xA;This is a multiline comment at the start &#xA;*/ birthDate</expression>
+        <output type="date">1974-12-25</output>
+    </test>
+    <test name="Mutliline comment at end" inputfile="patient-example.xml" predicate="false">
+        <expression>birthDate &#xA;/*&#xA;This is a multiline comment at the end &#xA;*/</expression>
+        <output type="date">1974-12-25</output>
+    </test>
+    <test name="Mutliline comment in middle" inputfile="patient-example.xml" predicate="false">
+        <expression>Patient.&#xA;/*&#xA;This is a multiline comment in the middle &#xA;*/ birthDate</expression>
+        <output type="date">1974-12-25</output>
+    </test>
+
+  </group>
+
 <!--
   <group name="testDollarResource">
 		testBoolean(patient(), patient().getManagingOrganization(), "Reference", "reference.startsWith('#').not() or (reference.substring(1).trace('url') in %resource.contained.id.trace('ids'))</expression><output type="boolean">true</output></test>
