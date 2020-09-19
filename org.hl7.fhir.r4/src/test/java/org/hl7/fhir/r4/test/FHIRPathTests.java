@@ -24,6 +24,7 @@ import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -84,6 +85,17 @@ public class FHIRPathTests {
 
     @Override
     public ValueSet resolveValueSet(Object appContext, String url) {
+        if (url.startsWith("testdata:")) {
+            XmlParser ip = new XmlParser();
+            try {
+                String filename = TestingUtilities.resourceNameToFile(url.substring(9));
+                ValueSet vs = (ValueSet) ip.parse(new FileInputStream(filename));
+
+                return vs;
+            } catch (IOException e) {
+                throw new Error(e);
+            }
+        }
       return TestingUtilities.context().fetchResource(ValueSet.class, url);
     }
   }
@@ -105,7 +117,7 @@ public class FHIRPathTests {
       XMLUtil.getNamedChildren(g, "test", list);
     }
 
-    List<Arguments> objects = new ArrayList();
+    List<Arguments> objects = new ArrayList<>();
     for (Element e : list) {
       objects.add(Arguments.of(getName(e), e));
     }
@@ -160,6 +172,7 @@ public class FHIRPathTests {
       outcome = fp.evaluate(res, node);
       Assertions.assertFalse(fail, String.format("Expected exception parsing %s", expression));
     } catch (Exception e) {
+      //e.printStackTrace();
       Assertions.assertTrue(fail, String.format("Unexpected exception parsing %s: " + e.getMessage(), expression));
     }
 
@@ -181,7 +194,7 @@ public class FHIRPathTests {
         if (outcome.get(i) instanceof Quantity)
           s = fp.convertToString(outcome.get(i));
         else
-          s = ((PrimitiveType) outcome.get(i)).asStringValue();
+          s = ((PrimitiveType<?>) outcome.get(i)).asStringValue();
         boolean found = false;
         for (Element e : expected) {
           if ((Utilities.noString(e.getAttribute("type")) || e.getAttribute("type").equals(tn)) &&
@@ -203,7 +216,7 @@ public class FHIRPathTests {
             Assertions.assertTrue(outcome.get(i).equalsDeep(q), String.format("Outcome %d: Value should be %s but was %s", i, v, outcome.get(i).toString()));
           } else {
             Assertions.assertTrue(outcome.get(i) instanceof PrimitiveType, String.format("Outcome %d: Value should be a primitive type but was %s", i, outcome.get(i).fhirType()));
-            Assertions.assertEquals(v, ((PrimitiveType) outcome.get(i)).asStringValue(), String.format("Outcome %d: Value should be %s but was %s for expression %s", i, v, outcome.get(i).toString(), expression));
+            Assertions.assertEquals(v, ((PrimitiveType<?>) outcome.get(i)).asStringValue(), String.format("Outcome %d: Value should be %s but was %s for expression %s", i, v, outcome.get(i).toString(), expression));
           }
         }
       }
