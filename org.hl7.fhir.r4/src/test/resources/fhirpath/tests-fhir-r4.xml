@@ -1009,6 +1009,38 @@
     <test inputfile="patient-example.xml"><expression invalid="true">conformsTo('http://trash')</expression></test>
 	</group>
 
+
+  <group name="testMemberOf">
+    <test name="Not MemberOf CodeableConcept" inputfile="observation-example.xml" predicate="false">
+        <expression>Observation.code.memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">false</output>
+    </test>
+    <test name="MemberOf CodeableConcept" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">true</output>
+    </test>
+    <test name="MemberOf Coding [0] true" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.coding[0].memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">true</output>
+    </test>
+    <test name="MemberOf Coding [1] true" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.coding[1].memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">true</output>
+    </test>
+    <test name="MemberOf Coding [2] false" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.coding[2].memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">false</output>
+    </test>
+    <test name="MemberOf Code [1] true" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.coding[1].code.memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">true</output>
+    </test>
+    <test name="MemberOf Code [2] false" inputfile="observation-example-cholesterol.xml" predicate="false">
+        <expression>Observation.code.coding[2].code.memberOf("testdata:valueset-example-expansion.xml")</expression>
+        <output type="boolean">false</output>
+    </test>
+  </group>
+
   <group name="testComments">
     <test name="Single line comment at start" inputfile="patient-example.xml" predicate="false">
         <expression>// This is a single line comment at the start&#xA;birthDate</expression>
