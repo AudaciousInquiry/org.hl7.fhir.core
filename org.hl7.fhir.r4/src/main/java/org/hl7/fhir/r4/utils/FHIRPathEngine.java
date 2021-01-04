@@ -254,7 +254,17 @@ public class FHIRPathEngine {
     public ValueSet resolveValueSet(Object appContext, String url);
   }
 
+  public interface IEvaluationContext2 extends IEvaluationContext {
+      /**
+       * @param appContext
+       * @param functionName
+       * @param focus
+       * @param parameters
+       * @return
+       */
+      public List<Base> executeFunction2(Object appContext, String functionName, List<Base> focus, List<List<Base>> parameters);
 
+  }
   /**
    * @param worker - used when validating paths (@check), and used doing value set membership when executing tests (once that's defined)
    */
@@ -2862,7 +2872,10 @@ public class FHIRPathEngine {
       List<List<Base>> params = new ArrayList<List<Base>>();
       for (ExpressionNode p : exp.getParameters())
         params.add(execute(context, focus, p, true));
-      return hostServices.executeFunction(context.appInfo, exp.getName(), params);
+      return
+          hostServices instanceof IEvaluationContext2 ?
+              ((IEvaluationContext2) hostServices).executeFunction2(context.appInfo, exp.getName(), focus, params) :
+              hostServices.executeFunction(context.appInfo, exp.getName(), params);
     }
     default:
       throw new Error("not Implemented yet");

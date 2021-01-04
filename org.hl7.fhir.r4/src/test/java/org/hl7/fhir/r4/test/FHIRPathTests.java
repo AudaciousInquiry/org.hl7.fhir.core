@@ -9,6 +9,7 @@ import org.hl7.fhir.r4.model.*;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
 import org.hl7.fhir.r4.utils.FHIRPathEngine;
 import org.hl7.fhir.r4.utils.FHIRPathEngine.IEvaluationContext;
+import org.hl7.fhir.r4.utils.FHIRPathEngine.IEvaluationContext2;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.junit.jupiter.api.Assertions;
@@ -36,7 +37,7 @@ import java.util.stream.Stream;
 
 public class FHIRPathTests {
 
-  public class FHIRPathTestEvaluationServices implements IEvaluationContext {
+  public class FHIRPathTestEvaluationServices implements IEvaluationContext2 {
 
     @Override
     public Base resolveConstant(Object appContext, String name, boolean beforeContext) throws PathEngineException {
@@ -69,6 +70,12 @@ public class FHIRPathTests {
     }
 
     @Override
+    public List<Base> executeFunction2(Object appContext, String functionName, List<Base> focus,
+        List<List<Base>> parameters) {
+        throw new NotImplementedException("Not done yet (FHIRPathTestEvaluationServices.executeFunction2), when item is element");
+    }
+
+    @Override
     public Base resolveReference(Object appContext, String url) throws FHIRException {
       throw new NotImplementedException("Not done yet (FHIRPathTestEvaluationServices.resolveReference), when item is element");
     }
@@ -98,6 +105,7 @@ public class FHIRPathTests {
         }
       return TestingUtilities.context().fetchResource(ValueSet.class, url);
     }
+
   }
 
   private static FHIRPathEngine fp;
